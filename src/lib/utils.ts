@@ -62,3 +62,28 @@ export function detectSourceFromUrl(url: string): string {
     return 'web'
   }
 }
+
+// Card canvas positioning constants and utilities
+export const CARD_DEFAULTS = { width: 240, height: 280 }
+export const CARD_GRID = { cols: 4, spacingX: 280, spacingY: 320, offsetX: 100, offsetY: 100 }
+
+export function getDefaultCardPosition(index: number) {
+  return {
+    x: CARD_GRID.offsetX + (index % CARD_GRID.cols) * CARD_GRID.spacingX,
+    y: CARD_GRID.offsetY + Math.floor(index / CARD_GRID.cols) * CARD_GRID.spacingY,
+    ...CARD_DEFAULTS,
+  }
+}
+
+export function ensureCardPosition(
+  card: Partial<{ x: number; y: number; width: number; height: number }>,
+  index: number
+) {
+  const defaults = getDefaultCardPosition(index)
+  return {
+    x: card.x ?? defaults.x,
+    y: card.y ?? defaults.y,
+    width: card.width ?? defaults.width,
+    height: card.height ?? defaults.height,
+  }
+}

@@ -69,19 +69,27 @@ export function AddReferencePanel({ boardId, onCardCreated, onCardAnalyzed }: Ad
   const imageInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Unified upload handler for both images and files
+  const handleUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    uploadType: 'image' | 'file'
+  ) => {
     const files = e.target.files
     if (!files || files.length === 0) return
+
+    const inputRef = uploadType === 'image' ? imageInputRef : fileInputRef
+    const typeLabel = uploadType === 'image' ? 'Images' : 'Files'
 
     setIsLoading(true)
     try {
       for (const file of Array.from(files)) {
-        if (!file.type.startsWith('image/')) {
+        // Validate image type for image uploads
+        if (uploadType === 'image' && !file.type.startsWith('image/')) {
           toast.error(`${file.name} is not an image`)
           continue
         }
 
-        // Upload file
+        // Upload file to storage
         const formData = new FormData()
         formData.append('file', file)
         formData.append('board_id', boardId)
@@ -97,18 +105,31 @@ export function AddReferencePanel({ boardId, onCardCreated, onCardAnalyzed }: Ad
 
         const { path, url } = await uploadRes.json()
 
+        // Build card data based on upload type
+        const cardData = uploadType === 'image'
+          ? {
+              board_id: boardId,
+              type: 'image',
+              source: 'upload',
+              title: file.name.replace(/\.[^/.]+$/, ''),
+              thumbnail_url: url,
+              file_path: path,
+            }
+          : {
+              board_id: boardId,
+              type: 'file',
+              source: 'upload',
+              title: file.name,
+              thumbnail_url: file.type === 'application/pdf' ? null : url,
+              file_path: path,
+              source_url: url,
+            }
+
         // Create card
         const cardRes = await fetch('/api/cards', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            board_id: boardId,
-            type: 'image',
-            source: 'upload',
-            title: file.name.replace(/\.[^/.]+$/, ''),
-            thumbnail_url: url,
-            file_path: path,
-          }),
+          body: JSON.stringify(cardData),
         })
 
         if (!cardRes.ok) {
@@ -119,73 +140,18 @@ export function AddReferencePanel({ boardId, onCardCreated, onCardAnalyzed }: Ad
         onCardCreated(card)
 
         // TODO: Re-enable AI analysis when ready
-        // triggerCardAnalysis(card.id, onCardAnalyzed)
+        // if (uploadType === 'image') {
+        //   triggerCardAnalysis(card.id, onCardAnalyzed)
+        // }
       }
-      toast.success('Images uploaded!')
+      toast.success(`${typeLabel} uploaded!`)
     } catch (error) {
-      console.error('Error uploading images:', error)
-      toast.error('Failed to upload images')
+      console.error(`Error uploading ${typeLabel.toLowerCase()}:`, error)
+      toast.error(`Failed to upload ${typeLabel.toLowerCase()}`)
     } finally {
       setIsLoading(false)
-      if (imageInputRef.current) {
-        imageInputRef.current.value = ''
-      }
-    }
-  }
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (!files || files.length === 0) return
-
-    setIsLoading(true)
-    try {
-      for (const file of Array.from(files)) {
-        // Upload file
-        const formData = new FormData()
-        formData.append('file', file)
-        formData.append('board_id', boardId)
-
-        const uploadRes = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
-        })
-
-        if (!uploadRes.ok) {
-          throw new Error('Upload failed')
-        }
-
-        const { path, url } = await uploadRes.json()
-
-        // Create card
-        const cardRes = await fetch('/api/cards', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            board_id: boardId,
-            type: 'file',
-            source: 'upload',
-            title: file.name,
-            thumbnail_url: file.type === 'application/pdf' ? null : url,
-            file_path: path,
-            url: url,
-          }),
-        })
-
-        if (!cardRes.ok) {
-          throw new Error('Failed to create card')
-        }
-
-        const card = await cardRes.json()
-        onCardCreated(card)
-      }
-      toast.success('Files uploaded!')
-    } catch (error) {
-      console.error('Error uploading files:', error)
-      toast.error('Failed to upload files')
-    } finally {
-      setIsLoading(false)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
+      if (inputRef.current) {
+        inputRef.current.value = ''
       }
     }
   }
@@ -255,7 +221,7 @@ export function AddReferencePanel({ boardId, onCardCreated, onCardAnalyzed }: Ad
           type: 'text',
           source: 'upload',
           title: textTitle.trim() || 'Text note',
-          user_note: textContent.trim(),
+          notes: textContent.trim(),
         }),
       })
 
@@ -322,7 +288,7 @@ export function AddReferencePanel({ boardId, onCardCreated, onCardAnalyzed }: Ad
         type="file"
         accept="image/*"
         multiple
-        onChange={handleImageUpload}
+        onChange={(e) => handleUpload(e, 'image')}
         className="hidden"
       />
       <input
@@ -330,7 +296,7 @@ export function AddReferencePanel({ boardId, onCardCreated, onCardAnalyzed }: Ad
         type="file"
         accept=".pdf,.doc,.docx"
         multiple
-        onChange={handleFileUpload}
+        onChange={(e) => handleUpload(e, 'file')}
         className="hidden"
       />
 

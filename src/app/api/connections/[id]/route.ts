@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
 import { updateConnectionSchema } from '@/lib/schemas'
+import { handleApiError } from '@/lib/api-utils'
 
 // PATCH /api/connections/[id] - Update a connection
 export async function PATCH(
@@ -31,11 +32,7 @@ export async function PATCH(
 
     return NextResponse.json(connection)
   } catch (error) {
-    if (error instanceof Error && error.name === 'ZodError') {
-      return NextResponse.json({ error: 'Invalid request data' }, { status: 400 })
-    }
-    console.error('Error in PATCH /api/connections/[id]:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleApiError(error, 'PATCH /api/connections/[id]')
   }
 }
 

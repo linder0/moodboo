@@ -17,7 +17,7 @@ import {
   Share2,
 } from 'lucide-react'
 import Link from 'next/link'
-import { cn } from '@/lib/utils'
+import { cn, ensureCardPosition } from '@/lib/utils'
 
 interface BoardWithData extends Board {
   cards: ReferenceCard[]
@@ -50,10 +50,7 @@ export default function BoardEditorPage() {
       // Ensure cards have default canvas positions if not set
       const cardsWithPositions = (data.cards || []).map((card: ReferenceCard, index: number) => ({
         ...card,
-        x: card.x ?? (100 + (index % 4) * 280),
-        y: card.y ?? (100 + Math.floor(index / 4) * 320),
-        width: card.width ?? 240,
-        height: card.height ?? 280,
+        ...ensureCardPosition(card, index),
       }))
 
       setBoard({
@@ -112,10 +109,7 @@ export default function BoardEditorPage() {
     const existingCards = board?.cards || []
     const newCard = {
       ...card,
-      x: card.x ?? (100 + (existingCards.length % 4) * 280),
-      y: card.y ?? (100 + Math.floor(existingCards.length / 4) * 320),
-      width: card.width ?? 240,
-      height: card.height ?? 280,
+      ...ensureCardPosition(card, existingCards.length),
     }
     setBoard(prev => prev ? { ...prev, cards: [...prev.cards, newCard] } : null)
     setShowAddPanel(false)

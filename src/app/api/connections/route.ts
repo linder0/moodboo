@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
 import { createConnectionSchema } from '@/lib/schemas'
+import { handleApiError } from '@/lib/api-utils'
 
 // GET /api/connections?board_id=xxx - Get all connections for a board
 export async function GET(request: NextRequest) {
@@ -73,10 +74,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(connection, { status: 201 })
   } catch (error) {
-    if (error instanceof Error && error.name === 'ZodError') {
-      return NextResponse.json({ error: 'Invalid request data' }, { status: 400 })
-    }
-    console.error('Error in POST /api/connections:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleApiError(error, 'POST /api/connections')
   }
 }

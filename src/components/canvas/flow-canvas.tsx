@@ -20,7 +20,7 @@ import { ReferenceCard } from '@/lib/types'
 import { CardNode } from './card-node'
 import { ReactiveGrid, GridPattern } from './reactive-grid'
 import { Grid3X3, Circle, Minus, Plus, Maximize2, Map, ChevronDown, Check } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, getDefaultCardPosition } from '@/lib/utils'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -193,18 +193,21 @@ function FlowCanvasInner({ cards, highlightedCardIds = [], onCardPositionChange,
 
   // Convert cards to React Flow nodes
   const initialNodes: Node[] = useMemo(() =>
-    cards.map((card, index) => ({
-      id: card.id,
-      type: 'card',
-      position: {
-        x: card.x ?? 100 + (index % 4) * 280,
-        y: card.y ?? 100 + Math.floor(index / 4) * 320,
-      },
-      data: {
-        card,
-        isHighlighted: highlightedCardIds.includes(card.id),
-      },
-    })),
+    cards.map((card, index) => {
+      const defaults = getDefaultCardPosition(index)
+      return {
+        id: card.id,
+        type: 'card',
+        position: {
+          x: card.x ?? defaults.x,
+          y: card.y ?? defaults.y,
+        },
+        data: {
+          card,
+          isHighlighted: highlightedCardIds.includes(card.id),
+        },
+      }
+    }),
     [cards, highlightedCardIds]
   )
 

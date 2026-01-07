@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase'
 import { updateBoardSchema } from '@/lib/schemas'
+import { handleApiError } from '@/lib/api-utils'
 
 // GET /api/boards/[id] - Get a single board with its cards
 export async function GET(
@@ -81,11 +82,7 @@ export async function PATCH(
 
     return NextResponse.json(board)
   } catch (error) {
-    if (error instanceof Error && error.name === 'ZodError') {
-      return NextResponse.json({ error: 'Invalid request data' }, { status: 400 })
-    }
-    console.error('Error in PATCH /api/boards/[id]:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleApiError(error, 'PATCH /api/boards/[id]')
   }
 }
 
