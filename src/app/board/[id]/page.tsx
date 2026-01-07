@@ -128,12 +128,12 @@ export default function BoardEditorPage() {
     })
   }, [])
 
-  // Debounced position save
-  const positionSaveTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map())
+  // Debounced card property saves
+  const cardSaveTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map())
 
-  const handleCardPositionChange = useCallback((cardId: string, x: number, y: number) => {
-    // Debounce save
-    const existing = positionSaveTimeouts.current.get(cardId)
+  const debouncedCardUpdate = useCallback((cardId: string, updates: Record<string, number>, debounceKey: string) => {
+    const key = `${cardId}-${debounceKey}`
+    const existing = cardSaveTimeouts.current.get(key)
     if (existing) clearTimeout(existing)
 
     const timeout = setTimeout(async () => {
@@ -141,16 +141,24 @@ export default function BoardEditorPage() {
         await fetch(`/api/cards/${cardId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ x, y }),
+          body: JSON.stringify(updates),
         })
       } catch (error) {
-        console.error('Failed to save position:', error)
+        console.error(`Failed to save card ${debounceKey}:`, error)
       }
-      positionSaveTimeouts.current.delete(cardId)
+      cardSaveTimeouts.current.delete(key)
     }, 500)
 
-    positionSaveTimeouts.current.set(cardId, timeout)
+    cardSaveTimeouts.current.set(key, timeout)
   }, [])
+
+  const handleCardPositionChange = useCallback((cardId: string, x: number, y: number) => {
+    debouncedCardUpdate(cardId, { x, y }, 'position')
+  }, [debouncedCardUpdate])
+
+  const handleCardResize = useCallback((cardId: string, width: number, height: number) => {
+    debouncedCardUpdate(cardId, { width, height }, 'resize')
+  }, [debouncedCardUpdate])
 
   const handleConnectionCreate = useCallback(async (fromId: string, toId: string) => {
     try {
@@ -187,6 +195,7 @@ export default function BoardEditorPage() {
         cards={board.cards}
         highlightedCardIds={highlightedCardIds}
         onCardPositionChange={handleCardPositionChange}
+        onCardResize={handleCardResize}
         onConnectionCreate={handleConnectionCreate}
       />
 

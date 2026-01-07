@@ -32,6 +32,7 @@ interface FlowCanvasProps {
   cards: ReferenceCard[]
   highlightedCardIds?: string[]
   onCardPositionChange?: (cardId: string, x: number, y: number) => void
+  onCardResize?: (cardId: string, width: number, height: number) => void
   onConnectionCreate?: (fromId: string, toId: string) => void
 }
 
@@ -187,7 +188,7 @@ function CanvasToolbar({
 }
 
 // Inner component that contains the ReactFlow
-function FlowCanvasInner({ cards, highlightedCardIds = [], onCardPositionChange, onConnectionCreate }: FlowCanvasProps) {
+function FlowCanvasInner({ cards, highlightedCardIds = [], onCardPositionChange, onCardResize, onConnectionCreate }: FlowCanvasProps) {
   const [gridPattern, setGridPattern] = useState<GridPattern>('dots')
   const [showMinimap, setShowMinimap] = useState(true)
 
@@ -241,11 +242,28 @@ function FlowCanvasInner({ cards, highlightedCardIds = [], onCardPositionChange,
     [onCardPositionChange]
   )
 
+  // Handle node resize end - save dimensions
+  const handleNodesChange = useCallback(
+    (changes: Parameters<typeof onNodesChange>[0]) => {
+      onNodesChange(changes)
+
+      // Check for resize end events
+      for (const change of changes) {
+        if (change.type === 'dimensions' && change.resizing === false && change.dimensions) {
+          if (onCardResize) {
+            onCardResize(change.id, change.dimensions.width, change.dimensions.height)
+          }
+        }
+      }
+    },
+    [onNodesChange, onCardResize]
+  )
+
   return (
     <ReactFlow
       nodes={nodes}
       edges={edges}
-      onNodesChange={onNodesChange}
+      onNodesChange={handleNodesChange}
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
       onNodeDragStop={onNodeDragStop}

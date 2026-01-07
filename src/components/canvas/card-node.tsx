@@ -1,7 +1,7 @@
 'use client'
 
 import { memo } from 'react'
-import { Handle, Position, NodeProps } from '@xyflow/react'
+import { Handle, Position, NodeProps, NodeResizer } from '@xyflow/react'
 import { ReferenceCard, CardSource } from '@/lib/types'
 import { ExternalLink, Link2, Type } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -35,7 +35,7 @@ function getDomainFromUrl(url: string): string {
   }
 }
 
-export const CardNode = memo(function CardNode({ data }: NodeProps) {
+export const CardNode = memo(function CardNode({ data, selected }: NodeProps) {
   const { card, isHighlighted } = data as CardNodeData
   const isLink = card.type === 'link'
   const isText = card.type === 'text'
@@ -44,6 +44,15 @@ export const CardNode = memo(function CardNode({ data }: NodeProps) {
 
   return (
     <div className="group relative">
+      {/* Node resizer - only visible when selected */}
+      <NodeResizer
+        minWidth={150}
+        minHeight={100}
+        isVisible={selected}
+        lineClassName="!border-[#c0b8aa]"
+        handleClassName="!w-2.5 !h-2.5 !bg-[#f5f2ed] !border-2 !border-[#c0b8aa] !rounded-sm"
+      />
+
       {/* Connection handles - z-20 to layer above card content */}
       <Handle
         type="target"
