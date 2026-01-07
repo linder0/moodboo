@@ -1,36 +1,109 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Creative Canvas — Moodboard to Brief
+
+**Drop any creative references (images, screenshots, files, links) into a board and get a coherent, client-ready photoshoot brief + shot list in minutes.**
+
+This is not a blank canvas like Miro. It's a **moodboard → brief generator**.
+
+## Target Users
+
+- Creative directors
+- Producers
+- Photographers
+- Stylists
+- Brand creative teams (fashion/lifestyle)
+
+## Features
+
+- **Collect**: Add references via image upload, file upload (PDFs), link paste, or text snippets
+- **Annotate**: Add notes, tags, and roles (lighting/styling/pose/etc.) to each reference
+- **Synthesize**: AI generates a complete photoshoot brief with concept, aesthetic clusters, direction, and shot list
+- **Export**: Download a client-ready PDF
+
+## Tech Stack
+
+- **Framework**: Next.js 14 (App Router)
+- **Database**: Supabase (PostgreSQL)
+- **File Storage**: Supabase Storage
+- **AI**: OpenAI GPT-4o (with vision)
+- **Styling**: Tailwind CSS + shadcn/ui
+- **PDF Export**: @react-pdf/renderer
 
 ## Getting Started
 
-First, run the development server:
+### 1. Clone and Install
+
+```bash
+npm install
+```
+
+### 2. Set up Supabase
+
+1. Create a new Supabase project at [supabase.com](https://supabase.com)
+2. Run the migration in `supabase/migrations/001_initial_schema.sql`
+3. Create a storage bucket named `references` with public access
+4. Copy your project URL and keys
+
+### 3. Configure Environment Variables
+
+Create a `.env.local` file:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+OPENAI_API_KEY=your_openai_api_key
+```
+
+### 4. Run Development Server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to view the app.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+/src
+  /app
+    /page.tsx                    # Board list
+    /board/[id]/page.tsx         # Board editor
+    /board/[id]/export/page.tsx  # Export preview
+    /api
+      /boards/route.ts           # CRUD boards
+      /cards/route.ts            # CRUD cards
+      /synthesize/route.ts       # AI synthesis
+      /link-preview/route.ts     # OpenGraph fetch
+      /export/route.ts           # PDF generation
 
-## Learn More
+  /components
+    /boards                      # Board list components
+    /editor                      # Board editor components
+    /output                      # AI output display components
+    /export                      # PDF export components
+    /ui                          # shadcn components
 
-To learn more about Next.js, take a look at the following resources:
+  /lib
+    /supabase.ts                 # Supabase client
+    /openai.ts                   # OpenAI client
+    /prompts.ts                  # AI synthesis prompts
+    /schemas.ts                  # Zod validation schemas
+    /types.ts                    # TypeScript types
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## AI Output Structure
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The synthesis generates:
 
-## Deploy on Vercel
+- **Concept**: Title, one-liner, description, keywords
+- **Aesthetic Clusters** (3 looks): Name, summary, rules, palette, lighting, styling, composition
+- **Direction Blocks**: Lighting, styling, composition with do/don't lists
+- **Shot List** (8-12 shots): Name, intent, camera notes, lighting, styling, props/location
+- **Global Do/Don't List**
+- **Deliverables** (optional)
+- **Risks & Mitigations** (optional)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## License
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT
