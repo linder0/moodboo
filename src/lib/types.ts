@@ -22,6 +22,32 @@ export type CardRole =
   | 'color'
   | 'general'
 
+// AI Vision Analysis types
+export type LightingType = 'natural' | 'studio' | 'mixed' | 'ambient'
+export type LightingDirection = 'front' | 'side' | 'back' | 'diffused' | 'top' | 'bottom'
+export type LightingQuality = 'hard' | 'soft' | 'dramatic' | 'flat'
+export type CompositionStyle = 'centered' | 'rule-of-thirds' | 'symmetrical' | 'asymmetrical' | 'diagonal'
+export type FramingType = 'tight' | 'medium' | 'wide' | 'extreme-close' | 'full-body'
+export type PerspectiveType = 'eye-level' | 'high-angle' | 'low-angle' | 'birds-eye' | 'worms-eye'
+
+export interface CardAnalysis {
+  palette: string[]  // Hex codes: ["#1a1a2e", "#e94560", ...]
+  lighting: {
+    type: LightingType
+    direction: LightingDirection
+    quality: LightingQuality
+    description: string  // "Soft window light from camera-left"
+  }
+  composition: {
+    style: CompositionStyle
+    framing: FramingType
+    perspective: PerspectiveType
+  }
+  mood: string[]     // ["intimate", "warm", "nostalgic"]
+  tags: string[]     // ["portrait", "indoor", "fashion", "minimal"]
+  summary: string    // One-sentence visual description
+}
+
 export interface ReferenceCard {
   id: string
   board_id: string
@@ -41,6 +67,8 @@ export interface ReferenceCard {
   y: number
   width: number
   height: number
+  // AI analysis
+  analysis: CardAnalysis | null
   created_at: string
 }
 
@@ -72,4 +100,26 @@ export interface Board {
   description: string | null
   created_at: string
   updated_at: string
+}
+
+// Board-level aesthetic summary (aggregated from card analyses)
+export interface BoardAesthetic {
+  dominantPalette: string[]    // Top 6 colors across all cards
+  lightingProfile: string      // "Predominantly soft natural light"
+  moodKeywords: string[]       // Merged + deduplicated from all cards
+  styleSignature: string       // AI-generated one-liner about the board's vibe
+  cardCount: number
+  analyzedCount: number
+}
+
+// Chat/Command Palette response types
+export interface ChatAction {
+  highlightCardIds?: string[]   // Cards to visually highlight
+  suggestedTags?: string[]      // Tags to add
+  generatedContent?: string     // For copy/synthesis requests
+}
+
+export interface ChatResponse {
+  message: string               // Natural language response
+  actions?: ChatAction
 }

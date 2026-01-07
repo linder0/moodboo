@@ -35,9 +35,30 @@ import { toast } from 'sonner'
 interface AddReferencePanelProps {
   boardId: string
   onCardCreated: (card: ReferenceCard) => void
+  onCardAnalyzed?: (cardId: string, analysis: ReferenceCard['analysis']) => void
 }
 
-export function AddReferencePanel({ boardId, onCardCreated }: AddReferencePanelProps) {
+// Trigger AI vision analysis for a card (fire-and-forget, runs in background)
+async function triggerCardAnalysis(
+  cardId: string,
+  onAnalyzed?: (cardId: string, analysis: ReferenceCard['analysis']) => void
+) {
+  try {
+    const response = await fetch(`/api/cards/${cardId}/analyze`, {
+      method: 'POST',
+    })
+
+    if (response.ok) {
+      const { analysis } = await response.json()
+      onAnalyzed?.(cardId, analysis)
+    }
+  } catch (error) {
+    // Silent failure - analysis is non-blocking
+    console.error('Background analysis failed:', error)
+  }
+}
+
+export function AddReferencePanel({ boardId, onCardCreated, onCardAnalyzed }: AddReferencePanelProps) {
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false)
   const [isTextDialogOpen, setIsTextDialogOpen] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
@@ -96,6 +117,9 @@ export function AddReferencePanel({ boardId, onCardCreated }: AddReferencePanelP
 
         const card = await cardRes.json()
         onCardCreated(card)
+
+        // TODO: Re-enable AI analysis when ready
+        // triggerCardAnalysis(card.id, onCardAnalyzed)
       }
       toast.success('Images uploaded!')
     } catch (error) {
@@ -201,6 +225,12 @@ export function AddReferencePanel({ boardId, onCardCreated }: AddReferencePanelP
 
       const card = await cardRes.json()
       onCardCreated(card)
+
+      // TODO: Re-enable AI analysis when ready
+      // if (card.thumbnail_url) {
+      //   triggerCardAnalysis(card.id, onCardAnalyzed)
+      // }
+
       setLinkUrl('')
       setIsLinkDialogOpen(false)
       toast.success('Link added!')

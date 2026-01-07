@@ -2,9 +2,11 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Board, ReferenceCard } from '@/lib/types'
+import { Board, ReferenceCard, CardAnalysis } from '@/lib/types'
 import { FlowCanvas } from '@/components/canvas/flow-canvas'
 import { AddReferencePanel } from '@/components/editor/add-reference-panel'
+import { AestheticWidget } from '@/components/canvas/aesthetic-widget'
+import { CommandPalette } from '@/components/canvas/command-palette'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
@@ -14,7 +16,8 @@ import {
   Check,
   Pencil,
   Plus,
-  X
+  X,
+  Command
 } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -33,6 +36,26 @@ export default function BoardEditorPage() {
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [editedTitle, setEditedTitle] = useState('')
   const [showAddPanel, setShowAddPanel] = useState(false)
+  const [showCommandPalette, setShowCommandPalette] = useState(false)
+  const [highlightedCardIds, setHighlightedCardIds] = useState<string[]>([])
+
+  // TODO: Re-enable Cmd+K shortcut when AI features are ready
+  // useEffect(() => {
+  //   const handleKeyDown = (e: KeyboardEvent) => {
+  //     if (
+  //       e.target instanceof HTMLInputElement ||
+  //       e.target instanceof HTMLTextAreaElement
+  //     ) {
+  //       return
+  //     }
+  //     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+  //       e.preventDefault()
+  //       setShowCommandPalette(true)
+  //     }
+  //   }
+  //   window.addEventListener('keydown', handleKeyDown)
+  //   return () => window.removeEventListener('keydown', handleKeyDown)
+  // }, [])
 
   const fetchBoard = useCallback(async () => {
     try {
@@ -109,6 +132,26 @@ export default function BoardEditorPage() {
     setShowAddPanel(false)
   }
 
+  // Called when a card's AI analysis completes
+  const handleCardAnalyzed = useCallback((cardId: string, analysis: CardAnalysis | null) => {
+    setBoard(prev => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        cards: prev.cards.map(c =>
+          c.id === cardId ? { ...c, analysis } : c
+        ),
+      }
+    })
+  }, [])
+
+  // Handle highlighting cards from command palette
+  const handleHighlightCards = useCallback((cardIds: string[]) => {
+    setHighlightedCardIds(cardIds)
+    // Clear highlights after 5 seconds
+    setTimeout(() => setHighlightedCardIds([]), 5000)
+  }, [])
+
   // Debounced position save
   const positionSaveTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map())
 
@@ -166,6 +209,7 @@ export default function BoardEditorPage() {
       {/* React Flow Canvas */}
       <FlowCanvas
         cards={board.cards}
+        highlightedCardIds={highlightedCardIds}
         onCardPositionChange={handleCardPositionChange}
         onConnectionCreate={handleConnectionCreate}
       />
@@ -247,10 +291,36 @@ export default function BoardEditorPage() {
             <AddReferencePanel
               boardId={boardId}
               onCardCreated={handleCardCreated}
+              onCardAnalyzed={handleCardAnalyzed}
             />
           </div>
         </div>
       )}
+
+      {/* TODO: Re-enable AI features when ready */}
+      {/* Command Palette Button */}
+      {/* <button
+        onClick={() => setShowCommandPalette(true)}
+        className="absolute bottom-6 left-6 z-[100] flex items-center gap-2 px-3 py-2 bg-[#2a2a2a] border border-[#3a3a3a] rounded-lg text-white/60 hover:text-white hover:bg-[#3a3a3a] transition-colors"
+      >
+        <Command className="w-4 h-4" />
+        <span className="text-sm">Ask AI</span>
+        <kbd className="ml-2 px-1.5 py-0.5 bg-[#3a3a3a] rounded text-[10px] text-white/40">
+          ⌘K
+        </kbd>
+      </button> */}
+
+      {/* AI Aesthetic Widget */}
+      {/* <AestheticWidget cards={board.cards} /> */}
+
+      {/* Command Palette */}
+      {/* <CommandPalette
+        isOpen={showCommandPalette}
+        onOpenChange={setShowCommandPalette}
+        boardId={boardId}
+        cards={board.cards}
+        onHighlightCards={handleHighlightCards}
+      /> */}
     </div>
   )
 }

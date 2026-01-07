@@ -22,6 +22,7 @@ import { ReactiveGrid } from './reactive-grid'
 
 interface FlowCanvasProps {
   cards: ReferenceCard[]
+  highlightedCardIds?: string[]
   onCardPositionChange?: (cardId: string, x: number, y: number) => void
   onConnectionCreate?: (fromId: string, toId: string) => void
 }
@@ -50,7 +51,7 @@ function ReactiveBackground() {
 }
 
 // Inner component that contains the ReactFlow
-function FlowCanvasInner({ cards, onCardPositionChange, onConnectionCreate }: FlowCanvasProps) {
+function FlowCanvasInner({ cards, highlightedCardIds = [], onCardPositionChange, onConnectionCreate }: FlowCanvasProps) {
   // Convert cards to React Flow nodes
   const initialNodes: Node[] = useMemo(() =>
     cards.map((card, index) => ({
@@ -62,9 +63,10 @@ function FlowCanvasInner({ cards, onCardPositionChange, onConnectionCreate }: Fl
       },
       data: {
         card,
+        isHighlighted: highlightedCardIds.includes(card.id),
       },
     })),
-    [cards]
+    [cards, highlightedCardIds]
   )
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)

@@ -4,13 +4,15 @@ import { memo } from 'react'
 import { Handle, Position, NodeProps } from '@xyflow/react'
 import { ReferenceCard } from '@/lib/types'
 import { ExternalLink } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface CardNodeData {
   card: ReferenceCard
+  isHighlighted?: boolean
 }
 
 export const CardNode = memo(function CardNode({ data }: NodeProps) {
-  const { card } = data as CardNodeData
+  const { card, isHighlighted } = data as CardNodeData
 
   return (
     <div className="group relative">
@@ -39,7 +41,12 @@ export const CardNode = memo(function CardNode({ data }: NodeProps) {
       />
 
       {/* Card content */}
-      <div className="w-[240px] bg-[#2a2a2a] border border-[#3a3a3a] rounded-lg overflow-hidden shadow-lg hover:border-[#4a4a4a] transition-colors">
+      <div className={cn(
+        "w-[240px] bg-[#2a2a2a] border rounded-lg overflow-hidden shadow-lg transition-all",
+        isHighlighted
+          ? "border-amber-400 ring-2 ring-amber-400/30 scale-105"
+          : "border-[#3a3a3a] hover:border-[#4a4a4a]"
+      )}>
         {/* Thumbnail */}
         {card.thumbnail_url ? (
           <div className="aspect-[4/3] bg-[#222] relative overflow-hidden">
