@@ -43,16 +43,16 @@ export function CreateBoardDialog({ onCreateBoard }: CreateBoardDialogProps) {
       <DialogTrigger asChild>
         <Button
           size="sm"
-          className="gap-1.5 bg-[#2c2c2c] text-white/80 border border-[#3d3d3d] hover:bg-[#3d3d3d] hover:text-white"
+          className="gap-1.5 bg-[#1a1816] text-[#e8e0d4] hover:bg-[#2a2826]"
         >
           <Plus className="h-4 w-4" />
           New
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[400px] bg-[#1d1d1d] border-[#3d3d3d]">
+      <DialogContent className="sm:max-w-[400px] bg-[#f5f2ed] border-[#d0c8ba]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle className="text-white/90 text-lg font-normal">New board</DialogTitle>
+            <DialogTitle className="text-[#1a1816] text-lg font-medium">New board</DialogTitle>
           </DialogHeader>
           <div className="py-4">
             <Input
@@ -60,7 +60,7 @@ export function CreateBoardDialog({ onCreateBoard }: CreateBoardDialogProps) {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               autoFocus
-              className="bg-[#2c2c2c] border-[#3d3d3d] text-white placeholder:text-white/30 focus-visible:ring-white/20"
+              className="bg-[#e8e0d4] border-[#d0c8ba] text-[#1a1816] placeholder:text-[#8a8278] focus-visible:ring-[#1a1816]/20"
             />
           </div>
           <DialogFooter className="gap-2 sm:gap-2">
@@ -70,7 +70,7 @@ export function CreateBoardDialog({ onCreateBoard }: CreateBoardDialogProps) {
               size="sm"
               onClick={() => setOpen(false)}
               disabled={isLoading}
-              className="text-white/50 hover:text-white hover:bg-white/10"
+              className="text-[#6b635a] hover:text-[#1a1816] hover:bg-[#ddd4c6]"
             >
               Cancel
             </Button>
@@ -78,7 +78,7 @@ export function CreateBoardDialog({ onCreateBoard }: CreateBoardDialogProps) {
               type="submit"
               size="sm"
               disabled={!title.trim() || isLoading}
-              className="bg-white text-black hover:bg-white/90"
+              className="bg-[#1a1816] text-[#e8e0d4] hover:bg-[#2a2826]"
             >
               {isLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

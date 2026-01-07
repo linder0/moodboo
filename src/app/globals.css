@@ -34,27 +34,27 @@
 
 :root {
   --font-outfit: 'Outfit', sans-serif;
-  --radius: 0.5rem;
+  --radius: 0.625rem;
 
-  /* Dark theme */
-  --background: #1a1a1a;
-  --foreground: #f5f5f5;
-  --card: #2a2a2a;
-  --card-foreground: #f5f5f5;
-  --popover: #2a2a2a;
-  --popover-foreground: #f5f5f5;
-  --primary: #f5f5f5;
-  --primary-foreground: #1a1a1a;
-  --secondary: #3a3a3a;
-  --secondary-foreground: #f5f5f5;
-  --muted: #3a3a3a;
-  --muted-foreground: #888;
-  --accent: #4a4a4a;
-  --accent-foreground: #f5f5f5;
-  --destructive: #ef4444;
-  --border: #3a3a3a;
-  --input: #3a3a3a;
-  --ring: #666;
+  /* Warm beige/tan theme */
+  --background: #e8e0d4;
+  --foreground: #1a1816;
+  --card: #f5f2ed;
+  --card-foreground: #1a1816;
+  --popover: #f5f2ed;
+  --popover-foreground: #1a1816;
+  --primary: #1a1816;
+  --primary-foreground: #e8e0d4;
+  --secondary: #ddd4c6;
+  --secondary-foreground: #1a1816;
+  --muted: #ddd4c6;
+  --muted-foreground: #6b635a;
+  --accent: #ddd4c6;
+  --accent-foreground: #1a1816;
+  --destructive: #dc2626;
+  --border: #d0c8ba;
+  --input: #d0c8ba;
+  --ring: #1a1816;
 }
 
 @layer base {
@@ -67,21 +67,21 @@
   }
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar - warm theme */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #2a2a2a;
+  background: #ddd4c6;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #4a4a4a;
+  background: #c0b8aa;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #5a5a5a;
+  background: #a8a090;
 }

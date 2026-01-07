@@ -2,32 +2,28 @@
 
 import { useEffect, useRef } from 'react'
 
+export type GridPattern = 'dots' | 'grid' | 'none'
+
 interface ReactiveGridProps {
-  dotSize?: number
-  dotSpacing?: number
-  dotColor?: string
-  glowRadius?: number
+  pattern?: GridPattern
+  spacing?: number
   zoom?: number
   offsetX?: number
   offsetY?: number
 }
 
 export function ReactiveGrid({
-  dotSize = 1.2,
-  dotSpacing = 32,
-  dotColor = 'rgba(255, 255, 255, 0.12)',
-  glowRadius = 120,
+  pattern = 'dots',
+  spacing = 32,
   zoom = 1,
   offsetX = 0,
   offsetY = 0,
 }: ReactiveGridProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const animationRef = useRef<number>()
-  const mouseRef = useRef({ x: -1000, y: -1000 })
-  const targetMouseRef = useRef({ x: -1000, y: -1000 })
 
   useEffect(() => {
+    if (pattern === 'none') return
     const canvas = canvasRef.current
     const container = containerRef.current
     if (!canvas || !container) return
@@ -35,12 +31,9 @@ export function ReactiveGrid({
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    let currentScale = 1
-
     // Set canvas size
     const resizeCanvas = () => {
       const dpr = window.devicePixelRatio || 1
-      currentScale = dpr
       const rect = container.getBoundingClientRect()
       canvas.width = rect.width * dpr
       canvas.height = rect.height * dpr
@@ -49,92 +42,88 @@ export function ReactiveGrid({
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     }
 
-    resizeCanvas()
-    window.addEventListener('resize', resizeCanvas)
-
-    // Track mouse with smooth interpolation - listen on window
-    const handleMouseMove = (e: MouseEvent) => {
+    const draw = () => {
       const rect = container.getBoundingClientRect()
-      // Check if mouse is over our container area
-      const x = e.clientX - rect.left
-      const y = e.clientY - rect.top
-
-      if (x >= 0 && x <= rect.width && y >= 0 && y <= rect.height) {
-        targetMouseRef.current = { x, y }
-      } else {
-        // Smoothly move away when outside
-        targetMouseRef.current = { x: -1000, y: -1000 }
-      }
-    }
-
-    // Listen on window to track mouse even with pointer-events-none
-    window.addEventListener('mousemove', handleMouseMove)
-
-    // Animation loop
-    const animate = () => {
-      const rect = container.getBoundingClientRect()
-
-      // Smooth mouse position interpolation
-      mouseRef.current.x += (targetMouseRef.current.x - mouseRef.current.x) * 0.15
-      mouseRef.current.y += (targetMouseRef.current.y - mouseRef.current.y) * 0.15
-
-      // Clear canvas
       ctx.clearRect(0, 0, rect.width, rect.height)
 
-      // Calculate grid bounds in canvas space (accounting for zoom and offset)
-      const scaledSpacing = dotSpacing * zoom
-      const scaledDotSize = dotSize * zoom
+      const scaledSpacing = spacing * zoom
 
-      // Calculate which dots are visible
+      // Calculate visible range
       const startCol = Math.floor(-offsetX / scaledSpacing) - 1
       const startRow = Math.floor(-offsetY / scaledSpacing) - 1
       const endCol = Math.ceil((rect.width - offsetX) / scaledSpacing) + 1
       const endRow = Math.ceil((rect.height - offsetY) / scaledSpacing) + 1
 
-      for (let i = startCol; i <= endCol; i++) {
-        for (let j = startRow; j <= endRow; j++) {
-          // Screen position of this dot
-          const screenX = i * scaledSpacing + offsetX
-          const screenY = j * scaledSpacing + offsetY
+      // Color relative to background (#e8e0d4) - warm brown tone
+      const r = 180, g = 168, b = 150
+      const alpha = 0.4
 
-          // Skip if off screen
-          if (screenX < -scaledSpacing || screenX > rect.width + scaledSpacing ||
-              screenY < -scaledSpacing || screenY > rect.height + scaledSpacing) {
-            continue
+      if (pattern === 'dots') {
+        const dotSize = 1.5 * zoom
+
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`
+
+        for (let i = startCol; i <= endCol; i++) {
+          for (let j = startRow; j <= endRow; j++) {
+            const screenX = i * scaledSpacing + offsetX
+            const screenY = j * scaledSpacing + offsetY
+
+            if (screenX < -scaledSpacing || screenX > rect.width + scaledSpacing ||
+                screenY < -scaledSpacing || screenY > rect.height + scaledSpacing) {
+              continue
+            }
+
+            ctx.beginPath()
+            ctx.arc(screenX, screenY, dotSize, 0, Math.PI * 2)
+            ctx.fill()
           }
+        }
+      } else {
+        // Draw grid lines
+        ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${alpha * 0.6})`
+        ctx.lineWidth = 1
+        ctx.lineCap = 'square'
 
-          // Calculate distance from mouse (in screen space)
-          const dx = screenX - mouseRef.current.x
-          const dy = screenY - mouseRef.current.y
-          const distance = Math.sqrt(dx * dx + dy * dy)
-
-          // Calculate intensity based on distance
-          const intensity = Math.max(0, 1 - distance / glowRadius)
-          const easeIntensity = intensity * intensity * (3 - 2 * intensity) // smoothstep
-
-          // Subtle opacity change only - constant size
-          const alpha = 0.12 + easeIntensity * 0.15
+        // Vertical lines
+        for (let i = startCol; i <= endCol; i++) {
+          const screenX = i * scaledSpacing + offsetX
+          if (screenX < -scaledSpacing || screenX > rect.width + scaledSpacing) continue
 
           ctx.beginPath()
-          ctx.arc(screenX, screenY, scaledDotSize, 0, Math.PI * 2)
-          ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`
-          ctx.fill()
+          ctx.moveTo(screenX, 0)
+          ctx.lineTo(screenX, rect.height)
+          ctx.stroke()
+        }
+
+        // Horizontal lines
+        for (let j = startRow; j <= endRow; j++) {
+          const screenY = j * scaledSpacing + offsetY
+          if (screenY < -scaledSpacing || screenY > rect.height + scaledSpacing) continue
+
+          ctx.beginPath()
+          ctx.moveTo(0, screenY)
+          ctx.lineTo(rect.width, screenY)
+          ctx.stroke()
         }
       }
-
-      animationRef.current = requestAnimationFrame(animate)
     }
 
-    animate()
+    resizeCanvas()
+    draw()
+
+    const handleResize = () => {
+      resizeCanvas()
+      draw()
+    }
+
+    window.addEventListener('resize', handleResize)
 
     return () => {
-      window.removeEventListener('resize', resizeCanvas)
-      window.removeEventListener('mousemove', handleMouseMove)
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current)
-      }
+      window.removeEventListener('resize', handleResize)
     }
-  }, [dotSize, dotSpacing, dotColor, glowRadius, zoom, offsetX, offsetY])
+  }, [pattern, spacing, zoom, offsetX, offsetY])
+
+  if (pattern === 'none') return null
 
   return (
     <div ref={containerRef} className="absolute inset-0 overflow-hidden pointer-events-none">

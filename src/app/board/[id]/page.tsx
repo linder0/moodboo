@@ -5,19 +5,16 @@ import { useParams, useRouter } from 'next/navigation'
 import { Board, ReferenceCard, CardAnalysis } from '@/lib/types'
 import { FlowCanvas } from '@/components/canvas/flow-canvas'
 import { AddReferencePanel } from '@/components/editor/add-reference-panel'
-import { AestheticWidget } from '@/components/canvas/aesthetic-widget'
-import { CommandPalette } from '@/components/canvas/command-palette'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import {
-  ArrowLeft,
   Loader2,
   Check,
   Pencil,
   Plus,
   X,
-  Command
+  Share2,
 } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -36,26 +33,7 @@ export default function BoardEditorPage() {
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [editedTitle, setEditedTitle] = useState('')
   const [showAddPanel, setShowAddPanel] = useState(false)
-  const [showCommandPalette, setShowCommandPalette] = useState(false)
   const [highlightedCardIds, setHighlightedCardIds] = useState<string[]>([])
-
-  // TODO: Re-enable Cmd+K shortcut when AI features are ready
-  // useEffect(() => {
-  //   const handleKeyDown = (e: KeyboardEvent) => {
-  //     if (
-  //       e.target instanceof HTMLInputElement ||
-  //       e.target instanceof HTMLTextAreaElement
-  //     ) {
-  //       return
-  //     }
-  //     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-  //       e.preventDefault()
-  //       setShowCommandPalette(true)
-  //     }
-  //   }
-  //   window.addEventListener('keydown', handleKeyDown)
-  //   return () => window.removeEventListener('keydown', handleKeyDown)
-  // }, [])
 
   const fetchBoard = useCallback(async () => {
     try {
@@ -94,6 +72,17 @@ export default function BoardEditorPage() {
   useEffect(() => {
     fetchBoard()
   }, [fetchBoard])
+
+  // Prevent browser zoom (ctrl+wheel) so only canvas zooms
+  useEffect(() => {
+    const preventZoom = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault()
+      }
+    }
+    document.addEventListener('wheel', preventZoom, { passive: false })
+    return () => document.removeEventListener('wheel', preventZoom)
+  }, [])
 
   const handleTitleSave = async () => {
     if (!editedTitle.trim() || editedTitle === board?.title) {
@@ -145,13 +134,6 @@ export default function BoardEditorPage() {
     })
   }, [])
 
-  // Handle highlighting cards from command palette
-  const handleHighlightCards = useCallback((cardIds: string[]) => {
-    setHighlightedCardIds(cardIds)
-    // Clear highlights after 5 seconds
-    setTimeout(() => setHighlightedCardIds([]), 5000)
-  }, [])
-
   // Debounced position save
   const positionSaveTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map())
 
@@ -194,8 +176,8 @@ export default function BoardEditorPage() {
 
   if (isLoading) {
     return (
-      <div className="h-screen bg-[#1a1a1a] flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-white/40" />
+      <div className="h-screen bg-[#e8e0d4] flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-[#6b635a]" />
       </div>
     )
   }
@@ -205,7 +187,7 @@ export default function BoardEditorPage() {
   }
 
   return (
-    <div className="h-screen w-screen bg-[#1a1a1a] overflow-hidden relative">
+    <div className="h-screen w-screen bg-[#e8e0d4] overflow-hidden relative">
       {/* React Flow Canvas */}
       <FlowCanvas
         cards={board.cards}
@@ -215,55 +197,71 @@ export default function BoardEditorPage() {
       />
 
       {/* Floating Header */}
-      <div className="absolute top-4 left-4 z-[100] flex items-center gap-3">
-        <Link href="/">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 bg-[#2a2a2a] border border-[#3a3a3a] text-white/70 hover:text-white hover:bg-[#3a3a3a]"
+      <div className="absolute top-4 left-4 z-[100]">
+        <div className="flex items-center bg-[#f5f2ed] border border-[#d0c8ba] rounded-lg shadow-sm p-1">
+          {/* Logo / Home Button */}
+          <Link
+            href="/"
+            className="flex items-center justify-center h-8 w-8 bg-[#1a1816] hover:bg-[#2a2826] transition-colors rounded-md"
           >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
+            <span className="text-[#faf8f5] font-medium text-sm">M</span>
+          </Link>
 
-        <div className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-lg px-3 py-1.5">
-          {isEditingTitle ? (
-            <div className="flex items-center gap-2">
-              <Input
-                value={editedTitle}
-                onChange={(e) => setEditedTitle(e.target.value)}
-                onBlur={handleTitleSave}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleTitleSave()
-                  if (e.key === 'Escape') {
-                    setIsEditingTitle(false)
-                    setEditedTitle(board.title)
-                  }
-                }}
-                autoFocus
-                className="h-6 text-sm bg-transparent border-none focus-visible:ring-0 px-0 text-white"
-              />
-              <Button size="icon" variant="ghost" onClick={handleTitleSave} className="h-5 w-5 text-white/50 hover:text-white">
-                <Check className="h-3 w-3" />
-              </Button>
+          {/* Separator */}
+          <div className="w-px h-5 bg-[#d0c8ba] mx-1" />
+
+          {/* Board Title */}
+          <div
+            className={cn(
+              "px-2 py-1 w-[180px] group",
+              !isEditingTitle && "cursor-pointer"
+            )}
+            onClick={() => !isEditingTitle && setIsEditingTitle(true)}
+          >
+            <div className="flex items-center justify-between w-full">
+              {isEditingTitle ? (
+                <>
+                  <input
+                    value={editedTitle}
+                    onChange={(e) => setEditedTitle(e.target.value)}
+                    onBlur={handleTitleSave}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleTitleSave()
+                      if (e.key === 'Escape') {
+                        setIsEditingTitle(false)
+                        setEditedTitle(board.title)
+                      }
+                    }}
+                    autoFocus
+                    className="h-6 text-sm bg-transparent border-0 outline-none px-0 text-[#1a1816] flex-1"
+                  />
+                  <Check
+                    className="h-3.5 w-3.5 flex-shrink-0 text-[#a09890] hover:text-[#1a1816] transition-colors cursor-pointer"
+                    onClick={handleTitleSave}
+                  />
+                </>
+              ) : (
+                <>
+                  <span className="text-sm font-medium text-[#1a1816] truncate">
+                    {board.title}
+                  </span>
+                  <Pencil className="h-3 w-3 flex-shrink-0 text-[#a09890] opacity-0 group-hover:opacity-100 transition-opacity" />
+                </>
+              )}
             </div>
-          ) : (
-            <button
-              onClick={() => setIsEditingTitle(true)}
-              className="flex items-center gap-2 group"
-            >
-              <span className="text-sm font-medium text-white/90">
-                {board.title}
-              </span>
-              <Pencil className="h-3 w-3 text-white/30 opacity-0 group-hover:opacity-100 transition-opacity" />
-            </button>
-          )}
-        </div>
+          </div>
 
-        <div className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-lg px-2 py-1">
-          <span className="text-xs text-white/50">
-            {board.cards.length} {board.cards.length === 1 ? 'item' : 'items'}
-          </span>
+          {/* Separator */}
+          <div className="w-px h-5 bg-[#d0c8ba] mx-1" />
+
+          {/* Share Button */}
+          <button
+            onClick={() => toast.info('Share feature coming soon!')}
+            title="Share"
+            className="h-8 w-8 flex items-center justify-center rounded-md transition-colors text-[#6b635a] hover:bg-[#e8e0d4]"
+          >
+            <Share2 className="h-4 w-4" />
+          </button>
         </div>
       </div>
 
@@ -273,10 +271,10 @@ export default function BoardEditorPage() {
           onClick={() => setShowAddPanel(!showAddPanel)}
           size="sm"
           className={cn(
-            "gap-1.5",
+            "gap-1.5 shadow-sm",
             showAddPanel
-              ? "bg-[#3a3a3a] text-white hover:bg-[#4a4a4a]"
-              : "bg-white text-black hover:bg-white/90"
+              ? "bg-[#ddd4c6] text-[#1a1816] hover:bg-[#d0c8ba] border border-[#d0c8ba]"
+              : "bg-[#1a1816] text-[#e8e0d4] hover:bg-[#2a2826]"
           )}
         >
           {showAddPanel ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
@@ -287,7 +285,7 @@ export default function BoardEditorPage() {
       {/* Floating Add Panel */}
       {showAddPanel && (
         <div className="absolute top-16 right-4 z-[100] w-80 animate-in slide-in-from-top-2 fade-in duration-200">
-          <div className="bg-[#2a2a2a] border border-[#3a3a3a] rounded-xl shadow-2xl p-4">
+          <div className="bg-[#f5f2ed] border border-[#d0c8ba] rounded-xl shadow-lg p-4">
             <AddReferencePanel
               boardId={boardId}
               onCardCreated={handleCardCreated}
@@ -296,31 +294,6 @@ export default function BoardEditorPage() {
           </div>
         </div>
       )}
-
-      {/* TODO: Re-enable AI features when ready */}
-      {/* Command Palette Button */}
-      {/* <button
-        onClick={() => setShowCommandPalette(true)}
-        className="absolute bottom-6 left-6 z-[100] flex items-center gap-2 px-3 py-2 bg-[#2a2a2a] border border-[#3a3a3a] rounded-lg text-white/60 hover:text-white hover:bg-[#3a3a3a] transition-colors"
-      >
-        <Command className="w-4 h-4" />
-        <span className="text-sm">Ask AI</span>
-        <kbd className="ml-2 px-1.5 py-0.5 bg-[#3a3a3a] rounded text-[10px] text-white/40">
-          ⌘K
-        </kbd>
-      </button> */}
-
-      {/* AI Aesthetic Widget */}
-      {/* <AestheticWidget cards={board.cards} /> */}
-
-      {/* Command Palette */}
-      {/* <CommandPalette
-        isOpen={showCommandPalette}
-        onOpenChange={setShowCommandPalette}
-        boardId={boardId}
-        cards={board.cards}
-        onHighlightCards={handleHighlightCards}
-      /> */}
     </div>
   )
 }
