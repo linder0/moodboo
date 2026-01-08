@@ -9,11 +9,14 @@ import {
   addEdge,
   Connection,
   Node,
+  Edge,
   NodeTypes,
   ReactFlowProvider,
   useStore,
   useReactFlow,
   Panel,
+  Viewport,
+  SelectionMode,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { ReferenceCard } from '@/lib/types'
@@ -33,12 +36,22 @@ interface FlowCanvasProps {
   highlightedCardIds?: string[]
   onCardPositionChange?: (cardId: string, x: number, y: number) => void
   onCardResize?: (cardId: string, width: number, height: number) => void
+  onCardDelete?: (cardId: string) => void
   onConnectionCreate?: (fromId: string, toId: string) => void
+  onViewportChange?: (viewport: { x: number; y: number; zoom: number }) => void
 }
 
 // Define custom node types
 const nodeTypes: NodeTypes = {
   card: CardNode,
+}
+
+// Shared edge style (used in onConnect and defaultEdgeOptions)
+const EDGE_STYLE = { stroke: '#d0c8bc', strokeWidth: 2 }
+
+// Toolbar separator component
+function ToolbarSeparator() {
+  return <div className="w-px h-5 bg-[#d0c8ba] mx-1" />
 }
 
 // Custom background that uses React Flow viewport
@@ -157,7 +170,7 @@ function CanvasToolbar({
           <Map className="h-4 w-4" />
         </ToolbarButton>
 
-        <div className="w-px h-5 bg-[#d0c8ba] mx-1" />
+        <ToolbarSeparator />
 
         <ToolbarButton onClick={() => zoomOut()} title="Zoom out">
           <Minus className="h-4 w-4" />
@@ -177,7 +190,7 @@ function CanvasToolbar({
           <Plus className="h-4 w-4" />
         </ToolbarButton>
 
-        <div className="w-px h-5 bg-[#d0c8ba] mx-1" />
+        <ToolbarSeparator />
 
         <ToolbarButton onClick={() => fitView({ padding: 0.2 })} title="Fit to screen">
           <Maximize2 className="h-4 w-4" />
@@ -188,7 +201,7 @@ function CanvasToolbar({
 }
 
 // Inner component that contains the ReactFlow
-function FlowCanvasInner({ cards, highlightedCardIds = [], onCardPositionChange, onCardResize, onConnectionCreate }: FlowCanvasProps) {
+function FlowCanvasInner({ cards, highlightedCardIds = [], onCardPositionChange, onCardResize, onCardDelete, onConnectionCreate, onViewportChange }: FlowCanvasProps) {
   const [gridPattern, setGridPattern] = useState<GridPattern>('dots')
   const [showMinimap, setShowMinimap] = useState(true)
 
@@ -206,14 +219,15 @@ function FlowCanvasInner({ cards, highlightedCardIds = [], onCardPositionChange,
         data: {
           card,
           isHighlighted: highlightedCardIds.includes(card.id),
+          onDelete: onCardDelete,
         },
       }
     }),
-    [cards, highlightedCardIds]
+    [cards, highlightedCardIds, onCardDelete]
   )
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
-  const [edges, setEdges, onEdgesChange] = useEdgesState([])
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
 
   // Handle new connections
   const onConnect = useCallback(
@@ -222,7 +236,7 @@ function FlowCanvasInner({ cards, highlightedCardIds = [], onCardPositionChange,
         ...params,
         type: 'smoothstep',
         animated: true,
-        style: { stroke: '#d0c8bc', strokeWidth: 2 },
+        style: EDGE_STYLE,
       }, eds))
 
       if (onConnectionCreate && params.source && params.target) {
@@ -259,6 +273,16 @@ function FlowCanvasInner({ cards, highlightedCardIds = [], onCardPositionChange,
     [onNodesChange, onCardResize]
   )
 
+  // Handle viewport changes (pan/zoom)
+  const handleMove = useCallback(
+    (_event: MouseEvent | TouchEvent | null, viewport: Viewport) => {
+      if (onViewportChange) {
+        onViewportChange(viewport)
+      }
+    },
+    [onViewportChange]
+  )
+
   return (
     <ReactFlow
       nodes={nodes}
@@ -267,13 +291,24 @@ function FlowCanvasInner({ cards, highlightedCardIds = [], onCardPositionChange,
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
       onNodeDragStop={onNodeDragStop}
+      onMove={handleMove}
       nodeTypes={nodeTypes}
       defaultViewport={{ x: 0, y: 0, zoom: 1 }}
       minZoom={0.1}
       maxZoom={2}
+      // Omnidirectional scroll panning
+      panOnScroll
+      panOnScrollSpeed={1.5}
+      // Zoom with ctrl/cmd + scroll
+      zoomOnScroll
+      // Selection drag (box select)
+      selectionOnDrag
+      selectionMode={SelectionMode.Partial}
+      // Allow panning by dragging canvas
+      panOnDrag={[1, 2]} // Left click and middle mouse button
       defaultEdgeOptions={{
         type: 'smoothstep',
-        style: { stroke: '#d0c8bc', strokeWidth: 2 },
+        style: EDGE_STYLE,
       }}
       proOptions={{ hideAttribution: true }}
       style={{ background: 'transparent' }}
