@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useState, useCallback } from 'react'
-import { NodeProps, NodeResizer, useUpdateNodeInternals } from '@xyflow/react'
+import { NodeProps, NodeResizer, useUpdateNodeInternals, useViewport } from '@xyflow/react'
 import { CardGroup } from '@/lib/types'
 import {
   ChevronDown,
@@ -36,13 +36,20 @@ interface GroupNodeData {
   onOpenNotes?: (groupId: string) => void
 }
 
+// Resize handle size constant
+const RESIZE_HANDLE_SIZE = 10
+
 export const GroupNode = memo(function GroupNode({ data, selected }: NodeProps) {
   const { group, cardCount, onUpdate, onDelete, onUngroup, onOpenNotes } = data as unknown as GroupNodeData
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [editedTitle, setEditedTitle] = useState(group.title)
+  const { zoom } = useViewport()
   const updateNodeInternals = useUpdateNodeInternals()
 
   const colors = GROUP_COLORS[group.color] || GROUP_COLORS.neutral
+  
+  // Zoom-agnostic handle size
+  const handleSize = RESIZE_HANDLE_SIZE / zoom
 
   const handleTitleSave = useCallback(() => {
     if (editedTitle.trim() && editedTitle !== group.title) {
@@ -104,14 +111,19 @@ export const GroupNode = memo(function GroupNode({ data, selected }: NodeProps) 
 
   return (
     <>
-      {/* Resizer - only when not locked */}
+      {/* Resizer - only when not locked, zoom-agnostic handles */}
       {!group.locked && (
         <NodeResizer
           minWidth={200}
           minHeight={150}
           isVisible={selected}
           lineClassName="!border-blue-400"
-          handleClassName="!w-2.5 !h-2.5 !bg-blue-500 !border-white"
+          handleStyle={{
+            width: handleSize,
+            height: handleSize,
+            backgroundColor: '#3b82f6',
+            border: '2px solid white',
+          }}
         />
       )}
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useState, useEffect, useMemo } from 'react'
-import { Handle, Position, NodeProps, useUpdateNodeInternals } from '@xyflow/react'
+import { Handle, Position, NodeProps, useUpdateNodeInternals, useViewport } from '@xyflow/react'
 import { ReferenceCard } from '@/lib/types'
 import { ExternalLink, Link2, Type, MoreVertical, Trash2 } from 'lucide-react'
 import {
@@ -27,9 +27,39 @@ interface CardNodeData {
   onDelete?: (cardId: string) => void
 }
 
-// Shared handle styles for connection points
-const HANDLE_CLASS = "!w-3 !h-3 !bg-[#c0b8aa] !border-2 !border-[#f5f2ed] opacity-0 group-hover:opacity-100 transition-opacity !z-20"
+// Base handle size in pixels (zoom-agnostic)
+const HANDLE_SIZE = 12
+const HANDLE_BORDER = 2
 
+// Zoom-agnostic connection handle
+function ZoomAgnosticHandle({ 
+  type, 
+  position, 
+  id,
+  zoom 
+}: { 
+  type: 'source' | 'target'
+  position: Position
+  id?: string
+  zoom: number 
+}) {
+  const size = HANDLE_SIZE / zoom
+  const border = HANDLE_BORDER / zoom
+  
+  return (
+    <Handle
+      type={type}
+      position={position}
+      id={id}
+      className="!bg-[#c0b8aa] !border-[#f5f2ed] opacity-0 group-hover:opacity-100 transition-opacity !z-20"
+      style={{
+        width: size,
+        height: size,
+        borderWidth: border,
+      }}
+    />
+  )
+}
 
 // External link button shown on hover
 function ExternalLinkButton({ url, variant = 'light' }: { url: string; variant?: 'light' | 'dark' }) {
@@ -57,8 +87,9 @@ export const CardNode = memo(function CardNode({ data }: NodeProps) {
   const sourceInfo = SOURCE_STYLES[card.source] || SOURCE_STYLES.web
   const domain = card.source_url ? getDomainFromUrl(card.source_url) : ''
 
-  // Track image dimensions for proper aspect ratio
+  // Track image dimensions and zoom for proper sizing
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null)
+  const { zoom } = useViewport()
   const updateNodeInternals = useUpdateNodeInternals()
 
   // Preload image to get dimensions ASAP
@@ -127,11 +158,11 @@ export const CardNode = memo(function CardNode({ data }: NodeProps) {
       className="group transition-all duration-200 ease-out"
       style={{ width: cardWidth, height: cardHeight }}
     >
-      {/* Connection handles */}
-      <Handle type="target" position={Position.Top} className={HANDLE_CLASS} />
-      <Handle type="source" position={Position.Bottom} className={HANDLE_CLASS} />
-      <Handle type="target" position={Position.Left} id="left" className={HANDLE_CLASS} />
-      <Handle type="source" position={Position.Right} id="right" className={HANDLE_CLASS} />
+      {/* Connection handles - zoom agnostic */}
+      <ZoomAgnosticHandle type="target" position={Position.Top} zoom={zoom} />
+      <ZoomAgnosticHandle type="source" position={Position.Bottom} zoom={zoom} />
+      <ZoomAgnosticHandle type="target" position={Position.Left} id="left" zoom={zoom} />
+      <ZoomAgnosticHandle type="source" position={Position.Right} id="right" zoom={zoom} />
 
       {/* Card content - explicit pixel dimensions */}
       <div
