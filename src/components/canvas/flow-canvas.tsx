@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ReactFlow,
   MiniMap,
@@ -20,10 +20,13 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { ReferenceCard } from '@/lib/types'
+import { CanvasTool } from './canvas-toolbar'
 import { CardNode } from './card-node'
+import { TextNode, NoteColor } from './text-node'
 import { ReactiveGrid, GridPattern } from './reactive-grid'
 import { Grid3X3, Circle, Minus, Plus, Maximize2, Map, ChevronDown, Check } from 'lucide-react'
 import { cn, getDefaultCardPosition } from '@/lib/utils'
+import { EDGE_STYLE } from '@/lib/design-tokens'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,20 +37,23 @@ import {
 interface FlowCanvasProps {
   cards: ReferenceCard[]
   highlightedCardIds?: string[]
+  activeTool?: CanvasTool
   onCardPositionChange?: (cardId: string, x: number, y: number) => void
   onCardResize?: (cardId: string, width: number, height: number) => void
   onCardDelete?: (cardId: string) => void
   onConnectionCreate?: (fromId: string, toId: string) => void
   onViewportChange?: (viewport: { x: number; y: number; zoom: number }) => void
+  onTextNoteCreate?: (x: number, y: number) => void
+  onFrameCreate?: (x: number, y: number, width: number, height: number) => void
 }
 
 // Define custom node types
 const nodeTypes: NodeTypes = {
   card: CardNode,
+  text: TextNode,
 }
 
-// Shared edge style (used in onConnect and defaultEdgeOptions)
-const EDGE_STYLE = { stroke: '#d0c8bc', strokeWidth: 2 }
+// Edge style imported from design-tokens
 
 // Toolbar separator component
 function ToolbarSeparator() {
@@ -201,9 +207,13 @@ function CanvasToolbar({
 }
 
 // Inner component that contains the ReactFlow
-function FlowCanvasInner({ cards, highlightedCardIds = [], onCardPositionChange, onCardResize, onCardDelete, onConnectionCreate, onViewportChange }: FlowCanvasProps) {
+function FlowCanvasInner({ cards, highlightedCardIds = [], activeTool = 'select', onCardPositionChange, onCardResize, onCardDelete, onConnectionCreate, onViewportChange, onTextNoteCreate, onFrameCreate }: FlowCanvasProps) {
   const [gridPattern, setGridPattern] = useState<GridPattern>('dots')
   const [showMinimap, setShowMinimap] = useState(true)
+  const { screenToFlowPosition } = useReactFlow()
+
+  // Local state for text notes (not persisted to DB yet)
+  const [textNotes, setTextNotes] = useState<Node[]>([])
 
   // Convert cards to React Flow nodes
   const initialNodes: Node[] = useMemo(() =>
@@ -228,6 +238,61 @@ function FlowCanvasInner({ cards, highlightedCardIds = [], onCardPositionChange,
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
+
+  // Sync nodes when cards prop changes (e.g., when new cards are added via paste/drop)
+  useEffect(() => {
+    setNodes((currentNodes) => {
+      const currentCardIds = new Set(currentNodes.filter(n => n.type === 'card').map(n => n.id))
+      const newCardIds = new Set(cards.map(c => c.id))
+
+      // Find cards that need to be added
+      const cardsToAdd = cards.filter(card => !currentCardIds.has(card.id))
+
+      // Find nodes that need to be removed (cards that were deleted)
+      const nodesToKeep = currentNodes.filter(node => {
+        if (node.type !== 'card') return true // Keep non-card nodes (text notes, frames)
+        return newCardIds.has(node.id)
+      })
+
+      // Update existing card nodes with new data (e.g., highlight state)
+      const updatedNodes = nodesToKeep.map(node => {
+        if (node.type !== 'card') return node
+        const card = cards.find(c => c.id === node.id)
+        if (!card) return node
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            card,
+            isHighlighted: highlightedCardIds.includes(card.id),
+            onDelete: onCardDelete,
+            onResize: onCardResize,
+          },
+        }
+      })
+
+      // Add new cards
+      const newNodes = cardsToAdd.map((card, index) => {
+        const defaults = getDefaultCardPosition(cards.indexOf(card))
+        return {
+          id: card.id,
+          type: 'card',
+          position: {
+            x: card.x ?? defaults.x,
+            y: card.y ?? defaults.y,
+          },
+          data: {
+            card,
+            isHighlighted: highlightedCardIds.includes(card.id),
+            onDelete: onCardDelete,
+            onResize: onCardResize,
+          },
+        }
+      })
+
+      return [...updatedNodes, ...newNodes]
+    })
+  }, [cards, highlightedCardIds, onCardDelete, setNodes])
 
   // Handle new connections
   const onConnect = useCallback(
@@ -283,6 +348,93 @@ function FlowCanvasInner({ cards, highlightedCardIds = [], onCardPositionChange,
     [onViewportChange]
   )
 
+  // Handle text note text changes
+  const handleTextChange = useCallback((nodeId: string, text: string) => {
+    setNodes((nds) =>
+      nds.map((node) =>
+        node.id === nodeId
+          ? { ...node, data: { ...node.data, text } }
+          : node
+      )
+    )
+  }, [setNodes])
+
+  // Handle text note color changes
+  const handleColorChange = useCallback((nodeId: string, color: NoteColor) => {
+    setNodes((nds) =>
+      nds.map((node) =>
+        node.id === nodeId
+          ? { ...node, data: { ...node.data, color } }
+          : node
+      )
+    )
+  }, [setNodes])
+
+  // Handle text note deletion
+  const handleTextNoteDelete = useCallback((nodeId: string) => {
+    setNodes((nds) => nds.filter((node) => node.id !== nodeId))
+  }, [setNodes])
+
+  // Handle pane click based on active tool
+  const handlePaneClick = useCallback(
+    (event: React.MouseEvent) => {
+      if (activeTool === 'select' || activeTool === 'add' || activeTool === 'connector') {
+        return // Default behavior or no action
+      }
+
+      // Convert screen position to flow position
+      const position = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      })
+
+      if (activeTool === 'text') {
+        // Create a new text note at click position
+        const newNote: Node = {
+          id: `text-${Date.now()}`,
+          type: 'text',
+          position,
+          data: {
+            text: '',
+            color: 'cream',
+            onTextChange: handleTextChange,
+            onColorChange: handleColorChange,
+            onDelete: handleTextNoteDelete,
+          },
+        }
+        setNodes((nds) => [...nds, newNote])
+
+        if (onTextNoteCreate) {
+          onTextNoteCreate(position.x, position.y)
+        }
+      }
+
+      if (activeTool === 'frame') {
+        // Create a simple frame at click position
+        // For now, create a fixed-size frame - drag-to-resize can be added later
+        const newFrame: Node = {
+          id: `frame-${Date.now()}`,
+          type: 'group',
+          position,
+          style: {
+            width: 400,
+            height: 300,
+            backgroundColor: 'rgba(232, 224, 212, 0.5)',
+            border: '2px dashed #d0c8ba',
+            borderRadius: 12,
+          },
+          data: { label: 'Frame' },
+        }
+        setNodes((nds) => [...nds, newFrame])
+
+        if (onFrameCreate) {
+          onFrameCreate(position.x, position.y, 400, 300)
+        }
+      }
+    },
+    [activeTool, screenToFlowPosition, setNodes, handleTextChange, handleColorChange, handleTextNoteDelete, onTextNoteCreate, onFrameCreate]
+  )
+
   return (
     <ReactFlow
       nodes={nodes}
@@ -292,6 +444,7 @@ function FlowCanvasInner({ cards, highlightedCardIds = [], onCardPositionChange,
       onConnect={onConnect}
       onNodeDragStop={onNodeDragStop}
       onMove={handleMove}
+      onPaneClick={handlePaneClick}
       nodeTypes={nodeTypes}
       defaultViewport={{ x: 0, y: 0, zoom: 1 }}
       minZoom={0.1}
@@ -301,17 +454,24 @@ function FlowCanvasInner({ cards, highlightedCardIds = [], onCardPositionChange,
       panOnScrollSpeed={1.5}
       // Zoom with ctrl/cmd + scroll
       zoomOnScroll
-      // Selection drag (box select)
-      selectionOnDrag
+      // Selection drag (box select) - disabled in connector mode
+      selectionOnDrag={activeTool === 'select'}
       selectionMode={SelectionMode.Partial}
+      // Enable click-to-connect when in connector mode
+      connectOnClick={activeTool === 'connector'}
       // Allow panning by dragging canvas
-      panOnDrag={[1, 2]} // Left click and middle mouse button
+      panOnDrag={activeTool === 'connector' ? false : [1, 2]} // Disable pan drag in connector mode
       defaultEdgeOptions={{
         type: 'smoothstep',
         style: EDGE_STYLE,
       }}
       proOptions={{ hideAttribution: true }}
-      style={{ background: 'transparent' }}
+      style={{
+        background: 'transparent',
+        cursor: activeTool === 'connector' ? 'crosshair' :
+                activeTool === 'text' ? 'text' :
+                activeTool === 'frame' ? 'crosshair' : 'default'
+      }}
     >
       {/* Reactive grid rendered inside ReactFlow so it can access viewport */}
       <ReactiveBackground pattern={gridPattern} />

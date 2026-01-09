@@ -1,84 +1,101 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import { Board, ReferenceCard, CardAnalysis } from '@/lib/types'
+import { useState, useCallback, useRef } from 'react'
+import { useParams } from 'next/navigation'
+import { ReferenceCard } from '@/lib/types'
 import { FlowCanvas } from '@/components/canvas/flow-canvas'
 import { AddReferencePanel } from '@/components/editor/add-reference-panel'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
+import { Loader2, Check, Pencil, Share2, ImagePlus } from 'lucide-react'
+import { cn, getCardDimensions } from '@/lib/utils'
+import { CanvasSidebar, CanvasTool } from '@/components/canvas/canvas-toolbar'
 import {
-  Loader2,
-  Check,
-  Pencil,
-  Plus,
-  X,
-  Share2,
-} from 'lucide-react'
-import Link from 'next/link'
-import { cn, ensureCardPosition } from '@/lib/utils'
-
-interface BoardWithData extends Board {
-  cards: ReferenceCard[]
-}
+  useBoardData,
+  useCanvasShortcuts,
+  useClipboardPaste,
+  useDebouncedCardUpdate,
+  useImageDrop,
+  usePreventBrowserZoom,
+} from '@/hooks'
 
 export default function BoardEditorPage() {
   const params = useParams()
-  const router = useRouter()
   const boardId = params.id as string
 
-  const [board, setBoard] = useState<BoardWithData | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  // Custom hooks
+  const {
+    board,
+    isLoading,
+    updateBoardTitle,
+    addCard,
+    updateCardAnalysis,
+    updateCardDimensions,
+    removeCard,
+  } = useBoardData(boardId)
+
+  const { updateCard } = useDebouncedCardUpdate()
+  usePreventBrowserZoom()
+
+  // UI state
   const [isEditingTitle, setIsEditingTitle] = useState(false)
   const [editedTitle, setEditedTitle] = useState('')
   const [showAddPanel, setShowAddPanel] = useState(false)
-  const [highlightedCardIds, setHighlightedCardIds] = useState<string[]>([])
+  const [highlightedCardIds] = useState<string[]>([])
+  const [activeTool, setActiveTool] = useState<CanvasTool>('select')
 
-  const fetchBoard = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/boards/${boardId}`)
-      if (!response.ok) {
-        if (response.status === 404) {
-          router.push('/')
-          return
-        }
-        throw new Error('Failed to fetch board')
-      }
-      const data = await response.json()
+  // Viewport tracking for positioning new cards
+  const viewportRef = useRef({ x: 0, y: 0, zoom: 1 })
 
-      // Ensure cards have default canvas positions if not set
-      const cardsWithPositions = (data.cards || []).map((card: ReferenceCard, index: number) => ({
-        ...card,
-        ...ensureCardPosition(card, index),
-      }))
-
-      setBoard({
-        ...data,
-        cards: cardsWithPositions,
-      })
-      setEditedTitle(data.title)
-    } catch (error) {
-      console.error('Error fetching board:', error)
-      toast.error('Failed to load board')
-    } finally {
-      setIsLoading(false)
+  const getViewportCenter = useCallback(() => {
+    const { x: vpX, y: vpY, zoom } = viewportRef.current
+    const windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1200
+    const windowHeight = typeof window !== 'undefined' ? window.innerHeight : 800
+    const centerX = (-vpX + windowWidth / 2) / zoom
+    const centerY = (-vpY + windowHeight / 2) / zoom
+    const offsetX = (Math.random() - 0.5) * 100
+    const offsetY = (Math.random() - 0.5) * 100
+    return {
+      x: Math.round(centerX + offsetX),
+      y: Math.round(centerY + offsetY),
     }
-  }, [boardId, router])
+  }, [])
 
-  useEffect(() => {
-    fetchBoard()
-  }, [fetchBoard])
-
-  // Prevent browser zoom (ctrl+wheel) so only canvas zooms
-  useEffect(() => {
-    const preventZoom = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault()
-      }
+  const screenToCanvasPosition = useCallback((clientX: number, clientY: number) => {
+    const { x: vpX, y: vpY, zoom } = viewportRef.current
+    return {
+      x: Math.round((clientX - vpX) / zoom),
+      y: Math.round((clientY - vpY) / zoom),
     }
-    document.addEventListener('wheel', preventZoom, { passive: false })
-    return () => document.removeEventListener('wheel', preventZoom)
+  }, [])
+
+  // Clipboard paste and drag-drop for images
+  useClipboardPaste({
+    boardId,
+    enabled: !isLoading && !!board,
+    onCardCreated: addCard,
+    onCardAnalyzed: updateCardAnalysis,
+    getViewportCenter,
+  })
+
+  const { isDragging } = useImageDrop({
+    boardId,
+    enabled: !isLoading && !!board,
+    onCardCreated: addCard,
+    onCardAnalyzed: updateCardAnalysis,
+    getDropPosition: screenToCanvasPosition,
+  })
+
+  useCanvasShortcuts({ activeTool, setActiveTool, setShowAddPanel })
+
+  // Event handlers
+  const handleToolChange = useCallback((tool: CanvasTool) => {
+    setActiveTool(tool)
+    setShowAddPanel(tool === 'add')
+  }, [])
+
+  const handleCloseAddPanel = useCallback(() => {
+    setShowAddPanel(false)
+    setActiveTool('select')
   }, [])
 
   const handleTitleSave = async () => {
@@ -89,92 +106,78 @@ export default function BoardEditorPage() {
     }
 
     try {
-      const response = await fetch(`/api/boards/${boardId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: editedTitle.trim() }),
-      })
-
-      if (!response.ok) throw new Error('Failed to update title')
-
-      setBoard(prev => prev ? { ...prev, title: editedTitle.trim() } : null)
+      await updateBoardTitle(editedTitle.trim())
       setIsEditingTitle(false)
-    } catch (error) {
-      console.error('Error updating title:', error)
-      toast.error('Failed to update title')
+    } catch {
+      setEditedTitle(board?.title || '')
+      setIsEditingTitle(false)
     }
   }
 
   const handleCardCreated = (card: ReferenceCard) => {
-    const existingCards = board?.cards || []
-    const newCard = {
-      ...card,
-      ...ensureCardPosition(card, existingCards.length),
+    const dimensions = getCardDimensions(card.type, card.source, !!card.thumbnail_url)
+    const { x: vpX, y: vpY, zoom } = viewportRef.current
+    const windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1200
+    const windowHeight = typeof window !== 'undefined' ? window.innerHeight : 800
+    const centerX = (-vpX + windowWidth / 2) / zoom - dimensions.width / 2
+    const centerY = (-vpY + windowHeight / 2) / zoom - dimensions.height / 2
+    const offsetX = (Math.random() - 0.5) * 100
+    const offsetY = (Math.random() - 0.5) * 100
+
+    const hasThumbnail = !!card.thumbnail_url
+    const position = {
+      x: Math.round(centerX + offsetX),
+      y: Math.round(centerY + offsetY),
+      width: hasThumbnail ? 0 : dimensions.width,
+      height: hasThumbnail ? 0 : dimensions.height,
     }
-    setBoard(prev => prev ? { ...prev, cards: [...prev.cards, newCard] } : null)
+
+    const newCard: ReferenceCard = { ...card, ...position }
+    addCard(newCard)
     setShowAddPanel(false)
+    setActiveTool('select')
+    updateCard(card.id, position, 'init')
   }
 
-  // Called when a card's AI analysis completes
-  const handleCardAnalyzed = useCallback((cardId: string, analysis: CardAnalysis | null) => {
-    setBoard(prev => {
-      if (!prev) return prev
-      return {
-        ...prev,
-        cards: prev.cards.map(c =>
-          c.id === cardId ? { ...c, analysis } : c
-        ),
-      }
-    })
-  }, [])
-
-  // Debounced card property saves
-  const cardSaveTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map())
-
-  const debouncedCardUpdate = useCallback((cardId: string, updates: Record<string, number>, debounceKey: string) => {
-    const key = `${cardId}-${debounceKey}`
-    const existing = cardSaveTimeouts.current.get(key)
-    if (existing) clearTimeout(existing)
-
-    const timeout = setTimeout(async () => {
-      try {
-        await fetch(`/api/cards/${cardId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updates),
-        })
-      } catch (error) {
-        console.error(`Failed to save card ${debounceKey}:`, error)
-      }
-      cardSaveTimeouts.current.delete(key)
-    }, 500)
-
-    cardSaveTimeouts.current.set(key, timeout)
-  }, [])
-
   const handleCardPositionChange = useCallback((cardId: string, x: number, y: number) => {
-    debouncedCardUpdate(cardId, { x, y }, 'position')
-  }, [debouncedCardUpdate])
+    updateCard(cardId, { x, y }, 'position')
+  }, [updateCard])
 
   const handleCardResize = useCallback((cardId: string, width: number, height: number) => {
-    debouncedCardUpdate(cardId, { width, height }, 'resize')
-  }, [debouncedCardUpdate])
+    updateCardDimensions(cardId, width, height)
+    updateCard(cardId, { width, height }, 'resize')
+  }, [updateCard, updateCardDimensions])
+
+  const handleCardDelete = useCallback(async (cardId: string) => {
+    try {
+      const response = await fetch(`/api/cards/${cardId}`, { method: 'DELETE' })
+      if (!response.ok) throw new Error('Failed to delete card')
+      removeCard(cardId)
+    } catch (error) {
+      console.error('Failed to delete card:', error)
+    }
+  }, [removeCard])
+
+  const handleViewportChange = useCallback((viewport: { x: number; y: number; zoom: number }) => {
+    viewportRef.current = viewport
+  }, [])
 
   const handleConnectionCreate = useCallback(async (fromId: string, toId: string) => {
     try {
       await fetch('/api/connections', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          board_id: boardId,
-          from_card_id: fromId,
-          to_card_id: toId,
-        }),
+        body: JSON.stringify({ board_id: boardId, from_card_id: fromId, to_card_id: toId }),
       })
     } catch (error) {
       console.error('Failed to save connection:', error)
     }
   }, [boardId])
+
+  // Sync edited title when board loads
+  if (board && !editedTitle && !isEditingTitle) {
+    setEditedTitle(board.title)
+  }
 
   if (isLoading) {
     return (
@@ -184,41 +187,42 @@ export default function BoardEditorPage() {
     )
   }
 
-  if (!board) {
-    return null
-  }
+  if (!board) return null
 
   return (
     <div className="h-screen w-screen bg-[#e8e0d4] overflow-hidden relative">
-      {/* React Flow Canvas */}
+      {/* Canvas */}
       <FlowCanvas
         cards={board.cards}
         highlightedCardIds={highlightedCardIds}
+        activeTool={activeTool}
         onCardPositionChange={handleCardPositionChange}
         onCardResize={handleCardResize}
+        onCardDelete={handleCardDelete}
         onConnectionCreate={handleConnectionCreate}
+        onViewportChange={handleViewportChange}
       />
 
-      {/* Floating Header */}
+      {/* Sidebar with integrated Add panel */}
+      <CanvasSidebar
+        activeTool={activeTool}
+        onToolChange={handleToolChange}
+        showAddPanel={showAddPanel}
+        onCloseAddPanel={handleCloseAddPanel}
+        addPanelContent={
+          <AddReferencePanel
+            boardId={boardId}
+            onCardCreated={handleCardCreated}
+            onCardAnalyzed={updateCardAnalysis}
+          />
+        }
+      />
+
+      {/* Header */}
       <div className="absolute top-4 left-4 z-[100]">
         <div className="flex items-center bg-[#f5f2ed] border border-[#d0c8ba] rounded-lg shadow-sm p-1">
-          {/* Logo / Home Button */}
-          <Link
-            href="/"
-            className="flex items-center justify-center h-8 w-8 bg-[#1a1816] hover:bg-[#2a2826] transition-colors rounded-md"
-          >
-            <span className="text-[#faf8f5] font-medium text-sm">M</span>
-          </Link>
-
-          {/* Separator */}
-          <div className="w-px h-5 bg-[#d0c8ba] mx-1" />
-
-          {/* Board Title */}
           <div
-            className={cn(
-              "px-2 py-1 w-[180px] group",
-              !isEditingTitle && "cursor-pointer"
-            )}
+            className={cn("px-2 py-1 w-[180px] group", !isEditingTitle && "cursor-pointer")}
             onClick={() => !isEditingTitle && setIsEditingTitle(true)}
           >
             <div className="flex items-center justify-between w-full">
@@ -245,19 +249,13 @@ export default function BoardEditorPage() {
                 </>
               ) : (
                 <>
-                  <span className="text-sm font-medium text-[#1a1816] truncate">
-                    {board.title}
-                  </span>
+                  <span className="text-sm font-medium text-[#1a1816] truncate">{board.title}</span>
                   <Pencil className="h-3 w-3 flex-shrink-0 text-[#a09890] opacity-0 group-hover:opacity-100 transition-opacity" />
                 </>
               )}
             </div>
           </div>
-
-          {/* Separator */}
           <div className="w-px h-5 bg-[#d0c8ba] mx-1" />
-
-          {/* Share Button */}
           <button
             onClick={() => toast.info('Share feature coming soon!')}
             title="Share"
@@ -268,32 +266,17 @@ export default function BoardEditorPage() {
         </div>
       </div>
 
-      {/* Floating Add Button */}
-      <div className="absolute top-4 right-4 z-[100]">
-        <Button
-          onClick={() => setShowAddPanel(!showAddPanel)}
-          size="sm"
-          className={cn(
-            "gap-1.5 shadow-sm",
-            showAddPanel
-              ? "bg-[#ddd4c6] text-[#1a1816] hover:bg-[#d0c8ba] border border-[#d0c8ba]"
-              : "bg-[#1a1816] text-[#e8e0d4] hover:bg-[#2a2826]"
-          )}
-        >
-          {showAddPanel ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-          {showAddPanel ? 'Close' : 'Add'}
-        </Button>
-      </div>
-
-      {/* Floating Add Panel */}
-      {showAddPanel && (
-        <div className="absolute top-16 right-4 z-[100] w-80 animate-in slide-in-from-top-2 fade-in duration-200">
-          <div className="bg-[#f5f2ed] border border-[#d0c8ba] rounded-xl shadow-lg p-4">
-            <AddReferencePanel
-              boardId={boardId}
-              onCardCreated={handleCardCreated}
-              onCardAnalyzed={handleCardAnalyzed}
-            />
+      {/* Drop overlay for drag-and-drop */}
+      {isDragging && (
+        <div className="absolute inset-0 z-[200] bg-[#1a1816]/60 backdrop-blur-sm flex items-center justify-center pointer-events-none animate-in fade-in duration-150">
+          <div className="flex flex-col items-center gap-4 text-white">
+            <div className="w-20 h-20 rounded-2xl bg-white/20 border-2 border-dashed border-white/60 flex items-center justify-center">
+              <ImagePlus className="w-10 h-10" />
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-medium">Drop images here</p>
+              <p className="text-sm text-white/70">Release to add to your moodboard</p>
+            </div>
           </div>
         </div>
       )}

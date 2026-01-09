@@ -28,8 +28,7 @@ export async function GET(
 
     return NextResponse.json(card)
   } catch (error) {
-    console.error('Error in GET /api/cards/[id]:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleApiError(error, 'GET /api/cards/[id]')
   }
 }
 
@@ -99,7 +98,6 @@ export async function DELETE(
 
     return new NextResponse(null, { status: 204 })
   } catch (error) {
-    console.error('Error in DELETE /api/cards/[id]:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleApiError(error, 'DELETE /api/cards/[id]')
   }
 }

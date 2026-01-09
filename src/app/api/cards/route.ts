@@ -28,8 +28,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(cards)
   } catch (error) {
-    console.error('Error in GET /api/cards:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleApiError(error, 'GET /api/cards')
   }
 }
 

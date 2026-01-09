@@ -63,9 +63,81 @@ export function detectSourceFromUrl(url: string): string {
   }
 }
 
-// Card canvas positioning constants and utilities
-export const CARD_DEFAULTS = { width: 240, height: 280 }
-export const CARD_GRID = { cols: 4, spacingX: 280, spacingY: 320, offsetX: 100, offsetY: 100 }
+// Card canvas positioning and dimension constants
+export const CARD_CONSTANTS = {
+  // Default card width used for all cards
+  WIDTH: 280,
+  // Fixed height for title/metadata section
+  TITLE_HEIGHT: 56,
+  // Height constraints (generous max to avoid cropping)
+  MIN_HEIGHT: 100,
+  MAX_HEIGHT: 800,
+  // Grid layout for initial positioning
+  GRID: { cols: 4, spacingX: 300, spacingY: 350, offsetX: 100, offsetY: 100 },
+}
+
+// Legacy exports for backwards compatibility
+export const CARD_DEFAULTS = { width: CARD_CONSTANTS.WIDTH, height: 280 }
+export const CARD_GRID = CARD_CONSTANTS.GRID
+
+// Dimensions by card type/source
+export const CARD_DIMENSIONS: Record<string, { width: number; height: number }> = {
+  // Embeds (cards without thumbnails)
+  tiktok: { width: 280, height: 500 },
+  youtube: { width: 400, height: 260 },
+  twitter: { width: 320, height: 200 },
+  // Cards with thumbnails
+  image: { width: 280, height: 320 },
+  // Other types
+  text: { width: 280, height: 200 },
+  default: { width: 280, height: 280 },
+}
+
+// Extract domain from URL for display
+export function getDomainFromUrl(url: string): string {
+  try {
+    const hostname = new URL(url).hostname
+    return hostname.replace(/^www\./, '')
+  } catch {
+    return ''
+  }
+}
+
+// Calculate card dimensions from image aspect ratio
+export function calculateCardDimensionsFromImage(
+  imageWidth: number,
+  imageHeight: number
+): { width: number; height: number } {
+  const aspectRatio = imageWidth / imageHeight
+  const cardWidth = CARD_CONSTANTS.WIDTH
+  const imageAreaHeight = cardWidth / aspectRatio
+  const totalHeight = Math.min(
+    Math.max(imageAreaHeight + CARD_CONSTANTS.TITLE_HEIGHT, CARD_CONSTANTS.MIN_HEIGHT),
+    CARD_CONSTANTS.MAX_HEIGHT
+  )
+  return { width: cardWidth, height: totalHeight }
+}
+
+export function getCardDimensions(
+  type: string,
+  source: string,
+  hasThumbnail: boolean = false
+): { width: number; height: number } {
+  // If card has a thumbnail, use standard image dimensions
+  // (embed dimensions are only for actual embeds without thumbnails)
+  if (hasThumbnail) {
+    return CARD_DIMENSIONS.image
+  }
+  // Check source for embeds
+  if (CARD_DIMENSIONS[source]) {
+    return CARD_DIMENSIONS[source]
+  }
+  // Then check type
+  if (CARD_DIMENSIONS[type]) {
+    return CARD_DIMENSIONS[type]
+  }
+  return CARD_DIMENSIONS.default
+}
 
 export function getDefaultCardPosition(index: number) {
   return {
@@ -78,12 +150,17 @@ export function getDefaultCardPosition(index: number) {
 export function ensureCardPosition(
   card: Partial<{ x: number; y: number; width: number; height: number }>,
   index: number
-) {
+): { x: number; y: number; width: number; height: number } {
   const defaults = getDefaultCardPosition(index)
+  // Treat 0 as unset since DB defaults to 0 and (0,0) is not a valid card position
+  const cardX = card.x
+  const cardY = card.y
+  const hasValidPosition = typeof cardX === 'number' && cardX !== 0
+
   return {
-    x: card.x ?? defaults.x,
-    y: card.y ?? defaults.y,
-    width: card.width ?? defaults.width,
-    height: card.height ?? defaults.height,
+    x: hasValidPosition ? cardX : defaults.x,
+    y: hasValidPosition && typeof cardY === 'number' ? cardY : defaults.y,
+    width: typeof card.width === 'number' && card.width > 0 ? card.width : defaults.width,
+    height: typeof card.height === 'number' && card.height > 0 ? card.height : defaults.height,
   }
 }

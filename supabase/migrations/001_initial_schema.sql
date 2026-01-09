@@ -55,3 +55,4 @@ CREATE POLICY "Allow all access to reference_cards" ON reference_cards FOR ALL U
 
 -- Storage bucket for uploads (run this in Supabase dashboard or via API)
 -- INSERT INTO storage.buckets (id, name, public) VALUES ('references', 'references', true);
+

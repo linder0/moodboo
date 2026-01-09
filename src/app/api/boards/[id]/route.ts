@@ -39,6 +39,18 @@ export async function GET(
       return NextResponse.json({ error: 'Failed to fetch cards' }, { status: 500 })
     }
 
+    // Get groups for this board
+    const { data: groups, error: groupsError } = await supabase
+      .from('card_groups')
+      .select('*')
+      .eq('board_id', id)
+      .order('created_at', { ascending: true })
+
+    if (groupsError) {
+      console.error('Error fetching groups:', groupsError)
+      // Non-fatal: continue without groups
+    }
+
     return NextResponse.json({
       id: board.id,
       title: board.title,
@@ -46,10 +58,10 @@ export async function GET(
       created_at: board.created_at,
       updated_at: board.updated_at,
       cards: cards || [],
+      groups: groups || [],
     })
   } catch (error) {
-    console.error('Error in GET /api/boards/[id]:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleApiError(error, 'GET /api/boards/[id]')
   }
 }
 
@@ -107,7 +119,6 @@ export async function DELETE(
 
     return new NextResponse(null, { status: 204 })
   } catch (error) {
-    console.error('Error in DELETE /api/boards/[id]:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return handleApiError(error, 'DELETE /api/boards/[id]')
   }
 }

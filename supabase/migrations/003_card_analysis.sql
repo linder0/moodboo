@@ -7,3 +7,4 @@ CREATE INDEX IF NOT EXISTS idx_reference_cards_analysis ON reference_cards USING
 
 -- Comment for documentation
 COMMENT ON COLUMN reference_cards.analysis IS 'AI-generated visual analysis including palette, lighting, composition, mood, tags, and summary';
+

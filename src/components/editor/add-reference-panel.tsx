@@ -161,17 +161,31 @@ export function AddReferencePanel({ boardId, onCardCreated, onCardAnalyzed }: Ad
 
     setIsLoading(true)
     try {
-      // Fetch link preview
-      const previewRes = await fetch('/api/link-preview', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: linkUrl.trim() }),
-      })
+      const url = linkUrl.trim()
+      const source = detectSourceFromUrl(url)
+
+      // Fetch both link preview and oEmbed in parallel
+      const [previewRes, oembedRes] = await Promise.all([
+        fetch('/api/link-preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        }),
+        fetch('/api/oembed', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        }),
+      ])
 
       const preview = await previewRes.json()
-      const source = detectSourceFromUrl(linkUrl.trim())
+      const oembed = await oembedRes.json()
 
-      // Create card
+      // Use oEmbed thumbnail if available, fall back to OpenGraph
+      const thumbnailUrl = oembed.thumbnail_url || preview.image || null
+      const title = oembed.title || preview.title || url
+
+      // Create card with embed data
       const cardRes = await fetch('/api/cards', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -179,9 +193,10 @@ export function AddReferencePanel({ boardId, onCardCreated, onCardAnalyzed }: Ad
           board_id: boardId,
           type: 'link',
           source,
-          title: preview.title || linkUrl.trim(),
-          thumbnail_url: preview.image,
-          url: linkUrl.trim(),
+          title,
+          thumbnail_url: thumbnailUrl,
+          source_url: url,
+          embed_html: oembed.embed_html || null,
         }),
       })
 

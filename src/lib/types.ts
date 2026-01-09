@@ -67,8 +67,32 @@ export interface ReferenceCard {
   y: number
   width: number
   height: number
+  // Embed data for link cards (TikTok, YouTube, etc.)
+  embed_html: string | null
   // AI analysis
   analysis: CardAnalysis | null
+  // Group membership
+  group_id: string | null
+  created_at: string
+}
+
+// Card group for organizing cards
+// GroupColor is now in @/lib/design-tokens for DRY
+import { GroupColor } from '@/lib/design-tokens'
+export type { GroupColor } from '@/lib/design-tokens'
+
+export interface CardGroup {
+  id: string
+  board_id: string
+  title: string
+  color: GroupColor
+  collapsed: boolean
+  locked: boolean
+  notes: string | null
+  x: number
+  y: number
+  width: number
+  height: number
   created_at: string
 }
 
@@ -98,6 +122,7 @@ export interface Board {
   id: string
   title: string
   description: string | null
+  synthesis_output?: SynthesisOutput | null
   created_at: string
   updated_at: string
 }
@@ -110,6 +135,56 @@ export interface BoardAesthetic {
   styleSignature: string       // AI-generated one-liner about the board's vibe
   cardCount: number
   analyzedCount: number
+}
+
+// Synthesis Output types (for PDF export)
+export interface SynthesisCluster {
+  name: string
+  summary: string
+  palette: string[]
+  lighting: string[]
+  styling: string[]
+  composition: string[]
+}
+
+export interface DirectionBlock {
+  bullets: string[]
+  dos: string[]
+  donts: string[]
+}
+
+export interface ShotListItem {
+  name: string
+  intent: string
+  camera: string
+  lighting: string
+  styling: string
+  propsLocation: string
+}
+
+export interface RiskItem {
+  risk: string
+  mitigation: string
+}
+
+export interface SynthesisOutput {
+  concept: {
+    title: string
+    oneLiner: string
+    description: string
+    keywords: string[]
+  }
+  clusters: SynthesisCluster[]
+  direction: {
+    lighting: DirectionBlock
+    styling: DirectionBlock
+    composition: DirectionBlock
+  }
+  shotList: ShotListItem[]
+  globalDos: string[]
+  globalDonts: string[]
+  deliverables?: string[]
+  risks?: RiskItem[]
 }
 
 // Chat/Command Palette response types

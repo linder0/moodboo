@@ -50,6 +50,7 @@ export const createCardSchema = z.object({
   tags: z.array(z.string()).optional().default([]),
   role: cardRoleSchema.nullable().optional(),
   pinned: z.boolean().optional().default(false),
+  embed_html: z.string().nullable().optional(),
 })
 
 export const updateCardSchema = z.object({
@@ -60,6 +61,55 @@ export const updateCardSchema = z.object({
   pinned: z.boolean().optional(),
   position: z.number().optional(),
   // Canvas position
+  x: z.number().optional(),
+  y: z.number().optional(),
+  width: z.number().optional(),
+  height: z.number().optional(),
+  // Group membership
+  group_id: z.string().uuid().nullable().optional(),
+})
+
+// Group color schema
+export const groupColorSchema = z.enum([
+  'neutral',
+  'red',
+  'orange',
+  'amber',
+  'yellow',
+  'lime',
+  'green',
+  'emerald',
+  'teal',
+  'cyan',
+  'sky',
+  'blue',
+  'indigo',
+  'violet',
+  'purple',
+  'fuchsia',
+  'pink',
+  'rose',
+])
+
+// Group schemas
+export const createGroupSchema = z.object({
+  board_id: z.string().uuid(),
+  title: z.string().optional().default('Untitled Group'),
+  color: groupColorSchema.optional().default('neutral'),
+  notes: z.string().nullable().optional(),
+  x: z.number().optional().default(0),
+  y: z.number().optional().default(0),
+  width: z.number().optional().default(400),
+  height: z.number().optional().default(300),
+  card_ids: z.array(z.string().uuid()).optional().default([]),
+})
+
+export const updateGroupSchema = z.object({
+  title: z.string().optional(),
+  color: groupColorSchema.optional(),
+  collapsed: z.boolean().optional(),
+  locked: z.boolean().optional(),
+  notes: z.string().nullable().optional(),
   x: z.number().optional(),
   y: z.number().optional(),
   width: z.number().optional(),
